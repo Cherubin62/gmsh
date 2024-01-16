@@ -2670,12 +2670,26 @@ Compute a cross field for the current mesh. The function creates 3 views: the H 
 @url{@value{GITLAB-PREFIX}/api/gmsh.h#L1838,C++}, @url{@value{GITLAB-PREFIX}/api/gmshc.h#L1626,C}, @url{@value{GITLAB-PREFIX}/api/gmsh.py#L5055,Python}, @url{@value{GITLAB-PREFIX}/api/gmsh.jl#L4467,Julia}
 @end table
 
-@item gmsh/model/mesh/triangulate
-Triangulate the points given in the @code{coord} vector as pairs of u, v coordinates, and return the node tags (with numbering starting at 1) of the resulting triangles in @code{tri}.
+@item gmsh/model/mesh/generateMesh
+Generate a mesh on one single mode entity of dimension @code{dim} and of tag @code{tag}. User can give a set of points in parameter coordinates in the @code{coord} vector. Parameter @code{refine} is set to 1 if additional points must be added by the mesher using standard gmsh algorithms.
 
 @table @asis
 @item Input:
-@code{coord} (vector of doubles)
+@code{dim} (integer), @code{tag} (integer), @code{refine} (boolean), @code{coord} (vector of doubles), @code{nodeTags} (vector of sizes)
+@item Output:
+-
+@item Return:
+-
+@item Language-specific definition:
+@url{@value{GITLAB-PREFIX}/api/gmsh.h#L1831,C++}, @url{@value{GITLAB-PREFIX}/api/gmshc.h#L1620,C}, @url{@value{GITLAB-PREFIX}/api/gmsh.py#L5033,Python}, @url{@value{GITLAB-PREFIX}/api/gmsh.jl#L4454,Julia}
+@end table
+
+@item gmsh/model/mesh/triangulate
+Triangulate the points given in the @code{coord} vector as pairs of u, v coordinates, and return the node tags (with numbering starting at 1) of the resulting triangles in @code{tri}. If specified, @code{edges} contains constrained edges in the mesh, given as pairs of nodes.
+
+@table @asis
+@item Input:
+@code{coord} (vector of doubles), @code{edges} (vector of sizes)
 @item Output:
 @code{tri} (vector of sizes)
 @item Return:
@@ -2700,6 +2714,48 @@ Tetrahedralize the points given in the @code{coord} vector as x, y, z coordinate
 @url{@value{GITLAB-PREFIX}/api/gmsh.h#L1853,C++}, @url{@value{GITLAB-PREFIX}/api/gmshc.h#L1639,C}, @url{@value{GITLAB-PREFIX}/api/gmsh.py#L5105,Python}, @url{@value{GITLAB-PREFIX}/api/gmsh.jl#L4518,Julia}
 @item Examples:
 Python (@url{@value{GITLAB-PREFIX}/examples/api/raw_tetrahedralization.py#L16,raw_tetrahedralization.py})
+@end table
+
+@item gmsh/model/mesh/constrainedDelaunayRefinement
+Apply a Delaunay refinement on entity of dimension @code{dim} and tag @code{tag}. @code{elementTags} contains a vector of the tags of the elements that need to be refined. @code{constrainedEdges} is a vector of size m*2 containing the edges that need to stay in the mesh, in the form of 2 successive nodes. @code{sizeField} is a vector containing the size at the nodes referenced by @code{nodeTags}. @code{minRadius} is the minimum allowed circumradius of elements in the mesh. An element that has a circumradius which is smaller than this value will not be refined. Return newly added nodes and corresponding size field, as well as the updated list of constrained edges and elements within the refinement.
+
+@table @asis
+@item Input:
+@code{dim} (integer), @code{tag} (integer), @code{elementTags} (vector of sizes), @code{constrainedEdges} (vector of sizes), @code{nodeTags} (vector of sizes), @code{sizeField} (vector of doubles), @code{minRadius} (double), @code{minQuality} (double)
+@item Output:
+@code{newNodeTags} (vector of sizes), @code{newCoords} (vector of doubles), @code{newSizeField} (vector of doubles), @code{newConstrainedEdges} (vector of vectors of sizes), @code{newElementsInRefinement} (vector of sizes)
+@item Return:
+-
+@item Language-specific definition:
+@url{@value{GITLAB-PREFIX}/api/gmsh.h#L1867,C++}, @url{@value{GITLAB-PREFIX}/api/gmshc.h#L1653,C}, @url{@value{GITLAB-PREFIX}/api/gmsh.py#L5120,Python}, @url{@value{GITLAB-PREFIX}/api/gmsh.jl#L4546,Julia}
+@end table
+
+@item gmsh/model/mesh/alphaShape
+alpha shape on the mesh of entity of dimension @code{dim} and tag @code{tag}.
+
+@table @asis
+@item Input:
+@code{dim} (integer), @code{tag} (integer), @code{alpha} (double), @code{nodeTags} (vector of sizes), @code{sizeAtNodes} (vector of doubles)
+@item Output:
+@code{elementTags} (vector of vectors of sizes), @code{edges} (vector of vectors of sizes)
+@item Return:
+-
+@item Language-specific definition:
+@url{@value{GITLAB-PREFIX}/api/gmsh.h#L1884,C++}, @url{@value{GITLAB-PREFIX}/api/gmshc.h#L1669,C}, @url{@value{GITLAB-PREFIX}/api/gmsh.py#L5188,Python}, @url{@value{GITLAB-PREFIX}/api/gmsh.jl#L4590,Julia}
+@end table
+
+@item gmsh/model/mesh/computeAlphaShape
+Compute the alpha shape of the set of points on the discrete entity defined by the first tag of @code{alphaShapeTags}, with the second tag its boundary. The alpha shape is computed with respect to a constant mean mesh size @code{hMean} (if @code{hMean} > 0) or to the size field defined by @code{sizeFieldCallback}. If desired, also refine the elements in the alpha shape so as to respect the size field defined by @code{sizeFieldCallback}. The new mesh will be stored in the discrete entities with tags @code{alphaShapeTags} = [alphaShapeTag, alphaShapeBoundaryTag].
+
+@table @asis
+@item Input:
+@code{dim} (integer), @code{alphaShapeTags} (vector of integers), @code{alpha} (double), @code{hMean} (double), @code{sizeFieldCallback} (), @code{refine} (integer)
+@item Output:
+-
+@item Return:
+-
+@item Language-specific definition:
+@url{@value{GITLAB-PREFIX}/api/gmsh.h#L1902,C++}, @url{@value{GITLAB-PREFIX}/api/gmshc.h#L1686,C}, @url{@value{GITLAB-PREFIX}/api/gmsh.py#L5227,Python}, @url{@value{GITLAB-PREFIX}/api/gmsh.jl#L4631,Julia}
 @end table
 
 @end ftable

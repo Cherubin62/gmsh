@@ -4478,25 +4478,52 @@ end
 const compute_cross_field = computeCrossField
 
 """
-    gmsh.model.mesh.triangulate(coord)
+    gmsh.model.mesh.generateMesh(dim, tag, refine, coord, nodeTags)
+
+Generate a mesh on one single mode entity of dimension `dim` and of tag `tag`.
+User can give a set of points in parameter coordinates in the `coord` vector.
+Parameter `refine` is set to 1 if additional points must be added by the mesher
+using standard gmsh algorithms.
+
+Types:
+ - `dim`: integer
+ - `tag`: integer
+ - `refine`: boolean
+ - `coord`: vector of doubles
+ - `nodeTags`: vector of sizes
+"""
+function generateMesh(dim, tag, refine, coord, nodeTags)
+    ierr = Ref{Cint}()
+    ccall((:gmshModelMeshGenerateMesh, gmsh.lib), Cvoid,
+          (Cint, Cint, Cint, Ptr{Cdouble}, Csize_t, Ptr{Csize_t}, Csize_t, Ptr{Cint}),
+          dim, tag, refine, convert(Vector{Cdouble}, coord), length(coord), convert(Vector{Csize_t}, nodeTags), length(nodeTags), ierr)
+    ierr[] != 0 && error(gmsh.logger.getLastError())
+    return nothing
+end
+const generate_mesh = generateMesh
+
+"""
+    gmsh.model.mesh.triangulate(coord, edges)
 
 Triangulate the points given in the `coord` vector as pairs of u, v coordinates,
 and return the node tags (with numbering starting at 1) of the resulting
-triangles in `tri`.
+triangles in `tri`. If specified, `edges` contains constrained edges in the
+mesh, given as pairs of nodes.
 
 Return `tri`.
 
 Types:
  - `coord`: vector of doubles
+ - `edges`: vector of sizes
  - `tri`: vector of sizes
 """
-function triangulate(coord)
+function triangulate(coord, edges)
     api_tri_ = Ref{Ptr{Csize_t}}()
     api_tri_n_ = Ref{Csize_t}()
     ierr = Ref{Cint}()
     ccall((:gmshModelMeshTriangulate, gmsh.lib), Cvoid,
-          (Ptr{Cdouble}, Csize_t, Ptr{Ptr{Csize_t}}, Ptr{Csize_t}, Ptr{Cint}),
-          convert(Vector{Cdouble}, coord), length(coord), api_tri_, api_tri_n_, ierr)
+          (Ptr{Cdouble}, Csize_t, Ptr{Csize_t}, Csize_t, Ptr{Ptr{Csize_t}}, Ptr{Csize_t}, Ptr{Cint}),
+          convert(Vector{Cdouble}, coord), length(coord), convert(Vector{Csize_t}, edges), length(edges), api_tri_, api_tri_n_, ierr)
     ierr[] != 0 && error(gmsh.logger.getLastError())
     tri = unsafe_wrap(Array, api_tri_[], api_tri_n_[], own = true)
     return tri
@@ -4526,6 +4553,134 @@ function tetrahedralize(coord)
     tetra = unsafe_wrap(Array, api_tetra_[], api_tetra_n_[], own = true)
     return tetra
 end
+
+"""
+    gmsh.model.mesh.constrainedDelaunayRefinement(dim, tag, elementTags, constrainedEdges, nodeTags, sizeField, minRadius, minQuality)
+
+Apply a Delaunay refinement on entity of dimension `dim` and tag `tag`.
+`elementTags` contains a vector of the tags of the elements that need to be
+refined. `constrainedEdges` is a vector of size m*2 containing the edges that
+need to stay in the mesh, in the form of 2 successive nodes. `sizeField` is a
+vector containing the size at the nodes referenced by `nodeTags`. `minRadius` is
+the minimum allowed circumradius of elements in the mesh. An element that has a
+circumradius which is smaller than this value will not be refined. Return newly
+added nodes and corresponding size field, as well as the updated list of
+constrained edges and elements within the refinement.
+
+Return `newNodeTags`, `newCoords`, `newSizeField`, `newConstrainedEdges`, `newElementsInRefinement`.
+
+Types:
+ - `dim`: integer
+ - `tag`: integer
+ - `elementTags`: vector of sizes
+ - `constrainedEdges`: vector of sizes
+ - `nodeTags`: vector of sizes
+ - `sizeField`: vector of doubles
+ - `minRadius`: double
+ - `minQuality`: double
+ - `newNodeTags`: vector of sizes
+ - `newCoords`: vector of doubles
+ - `newSizeField`: vector of doubles
+ - `newConstrainedEdges`: vector of vectors of sizes
+ - `newElementsInRefinement`: vector of sizes
+"""
+function constrainedDelaunayRefinement(dim, tag, elementTags, constrainedEdges, nodeTags, sizeField, minRadius, minQuality)
+    api_newNodeTags_ = Ref{Ptr{Csize_t}}()
+    api_newNodeTags_n_ = Ref{Csize_t}()
+    api_newCoords_ = Ref{Ptr{Cdouble}}()
+    api_newCoords_n_ = Ref{Csize_t}()
+    api_newSizeField_ = Ref{Ptr{Cdouble}}()
+    api_newSizeField_n_ = Ref{Csize_t}()
+    api_newConstrainedEdges_ = Ref{Ptr{Ptr{Csize_t}}}()
+    api_newConstrainedEdges_n_ = Ref{Ptr{Csize_t}}()
+    api_newConstrainedEdges_nn_ = Ref{Csize_t}()
+    api_newElementsInRefinement_ = Ref{Ptr{Csize_t}}()
+    api_newElementsInRefinement_n_ = Ref{Csize_t}()
+    ierr = Ref{Cint}()
+    ccall((:gmshModelMeshConstrainedDelaunayRefinement, gmsh.lib), Cvoid,
+          (Cint, Cint, Ptr{Csize_t}, Csize_t, Ptr{Csize_t}, Csize_t, Ptr{Csize_t}, Csize_t, Ptr{Cdouble}, Csize_t, Cdouble, Cdouble, Ptr{Ptr{Csize_t}}, Ptr{Csize_t}, Ptr{Ptr{Cdouble}}, Ptr{Csize_t}, Ptr{Ptr{Cdouble}}, Ptr{Csize_t}, Ptr{Ptr{Ptr{Csize_t}}}, Ptr{Ptr{Csize_t}}, Ptr{Csize_t}, Ptr{Ptr{Csize_t}}, Ptr{Csize_t}, Ptr{Cint}),
+          dim, tag, convert(Vector{Csize_t}, elementTags), length(elementTags), convert(Vector{Csize_t}, constrainedEdges), length(constrainedEdges), convert(Vector{Csize_t}, nodeTags), length(nodeTags), convert(Vector{Cdouble}, sizeField), length(sizeField), minRadius, minQuality, api_newNodeTags_, api_newNodeTags_n_, api_newCoords_, api_newCoords_n_, api_newSizeField_, api_newSizeField_n_, api_newConstrainedEdges_, api_newConstrainedEdges_n_, api_newConstrainedEdges_nn_, api_newElementsInRefinement_, api_newElementsInRefinement_n_, ierr)
+    ierr[] != 0 && error(gmsh.logger.getLastError())
+    newNodeTags = unsafe_wrap(Array, api_newNodeTags_[], api_newNodeTags_n_[], own = true)
+    newCoords = unsafe_wrap(Array, api_newCoords_[], api_newCoords_n_[], own = true)
+    newSizeField = unsafe_wrap(Array, api_newSizeField_[], api_newSizeField_n_[], own = true)
+    tmp_api_newConstrainedEdges_ = unsafe_wrap(Array, api_newConstrainedEdges_[], api_newConstrainedEdges_nn_[], own = true)
+    tmp_api_newConstrainedEdges_n_ = unsafe_wrap(Array, api_newConstrainedEdges_n_[], api_newConstrainedEdges_nn_[], own = true)
+    newConstrainedEdges = [ unsafe_wrap(Array, tmp_api_newConstrainedEdges_[i], tmp_api_newConstrainedEdges_n_[i], own = true) for i in 1:api_newConstrainedEdges_nn_[] ]
+    newElementsInRefinement = unsafe_wrap(Array, api_newElementsInRefinement_[], api_newElementsInRefinement_n_[], own = true)
+    return newNodeTags, newCoords, newSizeField, newConstrainedEdges, newElementsInRefinement
+end
+const constrained_delaunay_refinement = constrainedDelaunayRefinement
+
+"""
+    gmsh.model.mesh.alphaShape(dim, tag, alpha, nodeTags, sizeAtNodes)
+
+alpha shape on the mesh of entity of dimension `dim` and tag `tag`.
+
+Return `elementTags`, `edges`.
+
+Types:
+ - `dim`: integer
+ - `tag`: integer
+ - `alpha`: double
+ - `nodeTags`: vector of sizes
+ - `sizeAtNodes`: vector of doubles
+ - `elementTags`: vector of vectors of sizes
+ - `edges`: vector of vectors of sizes
+"""
+function alphaShape(dim, tag, alpha, nodeTags, sizeAtNodes)
+    api_elementTags_ = Ref{Ptr{Ptr{Csize_t}}}()
+    api_elementTags_n_ = Ref{Ptr{Csize_t}}()
+    api_elementTags_nn_ = Ref{Csize_t}()
+    api_edges_ = Ref{Ptr{Ptr{Csize_t}}}()
+    api_edges_n_ = Ref{Ptr{Csize_t}}()
+    api_edges_nn_ = Ref{Csize_t}()
+    ierr = Ref{Cint}()
+    ccall((:gmshModelMeshAlphaShape, gmsh.lib), Cvoid,
+          (Cint, Cint, Cdouble, Ptr{Csize_t}, Csize_t, Ptr{Cdouble}, Csize_t, Ptr{Ptr{Ptr{Csize_t}}}, Ptr{Ptr{Csize_t}}, Ptr{Csize_t}, Ptr{Ptr{Ptr{Csize_t}}}, Ptr{Ptr{Csize_t}}, Ptr{Csize_t}, Ptr{Cint}),
+          dim, tag, alpha, convert(Vector{Csize_t}, nodeTags), length(nodeTags), convert(Vector{Cdouble}, sizeAtNodes), length(sizeAtNodes), api_elementTags_, api_elementTags_n_, api_elementTags_nn_, api_edges_, api_edges_n_, api_edges_nn_, ierr)
+    ierr[] != 0 && error(gmsh.logger.getLastError())
+    tmp_api_elementTags_ = unsafe_wrap(Array, api_elementTags_[], api_elementTags_nn_[], own = true)
+    tmp_api_elementTags_n_ = unsafe_wrap(Array, api_elementTags_n_[], api_elementTags_nn_[], own = true)
+    elementTags = [ unsafe_wrap(Array, tmp_api_elementTags_[i], tmp_api_elementTags_n_[i], own = true) for i in 1:api_elementTags_nn_[] ]
+    tmp_api_edges_ = unsafe_wrap(Array, api_edges_[], api_edges_nn_[], own = true)
+    tmp_api_edges_n_ = unsafe_wrap(Array, api_edges_n_[], api_edges_nn_[], own = true)
+    edges = [ unsafe_wrap(Array, tmp_api_edges_[i], tmp_api_edges_n_[i], own = true) for i in 1:api_edges_nn_[] ]
+    return elementTags, edges
+end
+const alpha_shape = alphaShape
+
+"""
+    gmsh.model.mesh.computeAlphaShape(dim, alphaShapeTags, alpha, hMean, sizeFieldCallback, triangulate, refine)
+
+Compute the alpha shape of the set of points on the discrete entity defined by
+the first tag of `alphaShapeTags`, with the second tag its boundary. The alpha
+shape is computed with respect to a constant mean mesh size `hMean` (if `hMean`
+> 0) or to the size field defined by `sizeFieldCallback`. If desired, also
+refine the elements in the alpha shape so as to respect the size field defined
+by `sizeFieldCallback`. The new mesh will be stored in the discrete entities
+with tags `alphaShapeTags` = [alphaShapeTag, alphaShapeBoundaryTag].
+
+Types:
+ - `dim`: integer
+ - `alphaShapeTags`: vector of integers
+ - `alpha`: double
+ - `hMean`: double
+ - `sizeFieldCallback`: 
+ - `triangulate`: integer
+ - `refine`: integer
+"""
+function computeAlphaShape(dim, alphaShapeTags, alpha, hMean, sizeFieldCallback, triangulate, refine)
+    api_sizeFieldCallback__(dim, tag, x, y, z, lc, data) = sizeFieldCallback(dim, tag, x, y, z, lc)
+    api_sizeFieldCallback_ = @cfunction($api_sizeFieldCallback__, Cdouble, (Cint, Cint, Cdouble, Cdouble, Cdouble, Cdouble, Ptr{Cvoid}))
+    ierr = Ref{Cint}()
+    ccall((:gmshModelMeshComputeAlphaShape, gmsh.lib), Cvoid,
+          (Cint, Ptr{Cint}, Csize_t, Cdouble, Cdouble, Ptr{Cvoid}, Ptr{Cvoid}, Cint, Cint, Ptr{Cint}),
+          dim, convert(Vector{Cint}, alphaShapeTags), length(alphaShapeTags), alpha, hMean, api_sizeFieldCallback_, C_NULL, triangulate, refine, ierr)
+    ierr[] != 0 && error(gmsh.logger.getLastError())
+    return nothing
+end
+const compute_alpha_shape = computeAlphaShape
 
 """
     module gmsh.model.mesh.field

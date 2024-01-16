@@ -1916,6 +1916,7 @@ static void meshCompound(GFace *gf, bool verbose)
 }
 #endif
 
+
 void GFace::mesh(bool verbose)
 {
   if(CTX::instance()->debugSurface > 0 &&

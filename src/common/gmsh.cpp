@@ -63,12 +63,15 @@
 
 #if defined(HAVE_MESH)
 #include "Field.h"
+#include "meshGEdge.h"
 #include "meshGFace.h"
 #include "meshGFaceDelaunayInsertion.h"
 #include "meshGFaceOptimize.h"
 #include "meshGRegionDelaunayInsertion.h"
 #include "meshGRegionHxt.h"
 #include "gmshCrossFields.h"
+#include "alphaShapes.h"
+#include "meshTriangulation.h"
 #include "qualityMeasuresJacobian.h"
 #include "meshRenumber.h"
 #endif
@@ -5620,7 +5623,18 @@ gmsh::model::mesh::computeHomology(vectorpair &dimTags)
   GModel::current()->computeHomology(dimTags);
 }
 
+GMSH_API void gmsh::model::mesh::generateMesh(const int dim, const int tag, const bool refine, const std::vector<double> &coord, const std::vector<size_t> &nodeTags)
+{
+  if(!_checkInit()) return;
+#if defined(HAVE_MESH)
+  generateMesh_(dim, tag, refine, coord, nodeTags);
+#else
+  Msg::Error("alphaShapes requires the mesh and hxt modules");
+#endif
+}
+
 GMSH_API void gmsh::model::mesh::triangulate(const std::vector<double> &coord,
+                                             const std::vector<std::size_t> & edges,
                                              std::vector<std::size_t> &tri)
 {
   if(!_checkInit()) return;
@@ -5630,30 +5644,7 @@ GMSH_API void gmsh::model::mesh::triangulate(const std::vector<double> &coord,
     return;
   }
 #if defined(HAVE_MESH)
-  SBoundingBox3d bbox;
-  for(std::size_t i = 0; i < coord.size(); i += 2)
-    bbox += SPoint3(coord[i], coord[i + 1], 0.);
-  double lc = 10. * norm(SVector3(bbox.max(), bbox.min()));
-  std::vector<MVertex *> verts(coord.size() / 2);
-  std::size_t j = 0;
-  for(std::size_t i = 0; i < coord.size(); i += 2) {
-    double XX = 1.e-12 * lc * (double)rand() / (double)RAND_MAX;
-    double YY = 1.e-12 * lc * (double)rand() / (double)RAND_MAX;
-    MVertex *v = new MVertex(coord[i] + XX, coord[i + 1] + YY, 0.);
-    v->setIndex(j);
-    verts[j++] = v;
-  }
-  std::vector<MTriangle *> tris;
-  delaunayMeshIn2D(verts, tris);
-  if(tris.empty()) return;
-  tri.resize(3 * tris.size());
-  for(std::size_t i = 0; i < tris.size(); i++) {
-    MTriangle *t = tris[i];
-    for(std::size_t j = 0; j < 3; j++)
-      tri[3 * i + j] = t->getVertex(j)->getIndex() + 1; // start at 1
-  }
-  for(std::size_t i = 0; i < verts.size(); i++) delete verts[i];
-  for(std::size_t i = 0; i < tris.size(); i++) delete tris[i];
+  meshTriangulate2d(coord,tri, &edges);
 #else
   Msg::Error("Triangulate requires the mesh module");
 #endif
@@ -5695,6 +5686,48 @@ gmsh::model::mesh::tetrahedralize(const std::vector<double> &coord,
   Msg::Error("Tetrahedralize requires the mesh module");
 #endif
 }
+
+GMSH_API void 
+gmsh::model::mesh::constrainedDelaunayRefinement(const int dim, const int tag, const std::vector<size_t> &elementTags, const std::vector<size_t> &constrainedEdges, const std::vector<size_t> &nodeTags, const std::vector<double> &sizeField, const double minRadius, const double minQuality, std::vector<size_t> &newNodeTags, std::vector<double>& newCoords, std::vector<double>& newSizeField, std::vector<std::vector<size_t>>& newConstrainedEdges, std::vector<size_t>& newElementsInRefinement)
+{
+#if defined(HAVE_MESH) 
+  constrainedDelaunayRefinement_(dim, tag, elementTags, constrainedEdges, nodeTags, sizeField, minRadius, minQuality, newNodeTags, newCoords, newSizeField, newConstrainedEdges, newElementsInRefinement);
+#else
+  Msg::Error("constrainedDelaunayRefinement requires the mesh module");
+#endif  
+}
+
+GMSH_API void 
+gmsh::model::mesh::alphaShape(const int dim, const int tag, const double alpha, const std::vector<size_t> &nodeTags, const std::vector<double> &sizeAtNodes, std::vector<std::vector<size_t>> &elementTags, std::vector<std::vector<size_t>> &edges)
+{
+#if defined(HAVE_MESH)
+  alphaShape_entity(dim, tag, alpha, nodeTags, sizeAtNodes, elementTags, edges);
+#else
+  Msg::Error("constrainedDelaunayRefinement requires the mesh module");
+#endif  
+}
+
+GMSH_API void
+gmsh::model::mesh::computeAlphaShape(const int dim, 
+                                     const std::vector<int> & alphaShapeTags, 
+                                     const double alpha, const double hMean, 
+                                     std::function<double(int, int, double, double, double, double)> sizeFieldCallback, 
+                                     const int triangulate,
+                                     const int refine)
+{
+#if defined(HAVE_MESH) && defined(HAVE_HXT)
+  if (dim == 2)
+    _computeAlphaShape(alphaShapeTags, alpha, hMean, sizeFieldCallback, triangulate, refine);
+  else if (dim == 3)
+    _computeAlphaShape3D(alphaShapeTags, alpha, hMean, sizeFieldCallback, refine);
+  else 
+    Msg::Error("Wrong dimension in alpha shape; 2 or 3");
+#else 
+  Msg::Error("performAlphaShapeAndRefine requires the mesh and hxt modules");
+#endif
+}
+
+
 
 // gmsh::model::mesh::field
 

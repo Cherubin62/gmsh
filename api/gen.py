@@ -576,11 +576,23 @@ mesh.add('computeHomology', doc, None, ovectorpair('dimTags'))
 doc = '''Compute a cross field for the current mesh. The function creates 3 views: the H function, the Theta function and cross directions. Return the tags of the views.'''
 mesh.add('computeCrossField', doc, None, ovectorint('viewTags'))
 
-doc = '''Triangulate the points given in the `coord' vector as pairs of u, v coordinates, and return the node tags (with numbering starting at 1) of the resulting triangles in `tri'.'''
-mesh.add('triangulate', doc, None, ivectordouble('coord'), ovectorsize('tri'))
+doc = '''Generate a mesh on one single mode entity of dimension `dim' and of tag `tag'. User can give a set of points in parameter coordinates in the `coord' vector. Parameter `refine' is set to 1 if additional points must be added by the mesher using standard gmsh algorithms.'''
+mesh.add('generateMesh', doc, None, iint('dim'), iint('tag'), ibool('refine'), ivectordouble('coord'), ivectorsize('nodeTags'))
+
+doc = '''Triangulate the points given in the `coord' vector as pairs of u, v coordinates, and return the node tags (with numbering starting at 1) of the resulting triangles in `tri'. If specified, `edges' contains constrained edges in the mesh, given as pairs of nodes.'''
+mesh.add('triangulate', doc, None, ivectordouble('coord'), ivectorsize('edges'), ovectorsize('tri'))
 
 doc = '''Tetrahedralize the points given in the `coord' vector as x, y, z coordinates, concatenated, and return the node tags (with numbering starting at 1) of the resulting tetrahedra in `tetra'.'''
 mesh.add('tetrahedralize', doc, None, ivectordouble('coord'), ovectorsize('tetra'))
+
+doc = '''Apply a Delaunay refinement on entity of dimension `dim' and tag `tag'. `elementTags' contains a vector of the tags of the elements that need to be refined. `constrainedEdges' is a vector of size m*2 containing the edges that need to stay in the mesh, in the form of 2 successive nodes. `sizeField' is a vector containing the size at the nodes referenced by `nodeTags'. `minRadius' is the minimum allowed circumradius of elements in the mesh. An element that has a circumradius which is smaller than this value will not be refined. Return newly added nodes and corresponding size field, as well as the updated list of constrained edges and elements within the refinement.'''
+mesh.add('constrainedDelaunayRefinement', doc, None, iint('dim'), iint('tag'), ivectorsize('elementTags'), ivectorsize('constrainedEdges'), ivectorsize('nodeTags'), ivectordouble('sizeField'), idouble('minRadius'), idouble('minQuality'), ovectorsize('newNodeTags'), ovectordouble('newCoords'), ovectordouble('newSizeField'), ovectorvectorsize('newConstrainedEdges'), ovectorsize('newElementsInRefinement'))
+
+doc = '''alpha shape on the mesh of entity of dimension `dim' and tag `tag'.'''
+mesh.add('alphaShape', doc, None, iint('dim'), iint('tag'), idouble('alpha'), ivectorsize('nodeTags'), ivectordouble('sizeAtNodes'), ovectorvectorsize('elementTags'), ovectorvectorsize('edges'))
+
+doc = '''Compute the alpha shape of the set of points on the discrete entity defined by the first tag of `alphaShapeTags', with the second tag its boundary. The alpha shape is computed with respect to a constant mean mesh size `hMean' (if `hMean' > 0) or to the size field defined by `sizeFieldCallback'. If desired, also refine the elements in the alpha shape so as to respect the size field defined by `sizeFieldCallback'. The new mesh will be stored in the discrete entities with tags `alphaShapeTags' = [alphaShapeTag, alphaShapeBoundaryTag].'''
+mesh.add('computeAlphaShape', doc, None, iint('dim'), ivectorint('alphaShapeTags'), idouble('alpha'), idouble('hMean'), isizefun('sizeFieldCallback'), iint('triangulate'), iint('refine'))
 
 ################################################################################
 
@@ -681,7 +693,8 @@ doc = '''Add a point in the built-in CAD representation, at coordinates (`x', `y
 geo.add('addPointOnGeometry', doc, oint, iint('geometryTag'), idouble('x'), idouble('y'), idouble('z', '0.'), idouble('meshSize', '0.'), iint('tag', '-1'))
 
 doc = '''Extrude the entities `dimTags' (given as a vector of (dim, tag) pairs) in the built-in CAD representation, using a translation along (`dx', `dy', `dz'). Return extruded entities in `outDimTags'. If the `numElements' vector is not empty, also extrude the mesh: the entries in `numElements' give the number of elements in each layer. If the `height' vector is not empty, it provides the (cumulative) height of the different layers, normalized to 1. If `recombine' is set, recombine the mesh in the layers.'''
-geo.add('extrude', doc, None, ivectorpair('dimTags'), idouble('dx'), idouble('dy'), idouble('dz'), ovectorpair('outDimTags'), ivectorint('numElements', 'std::vector<int>()', '[]', '[]'), ivectordouble('heights', 'std::vector<double>()', '[]', '[]'), ibool('recombine', 'false', 'False'))
+geo.add('extrude', doc, None, 
+ivectorpair('dimTags'), idouble('dx'), idouble('dy'), idouble('dz'), ovectorpair('outDimTags'), ivectorint('numElements', 'std::vector<int>()', '[]', '[]'), ivectordouble('heights', 'std::vector<double>()', '[]', '[]'), ibool('recombine', 'false', 'False'))
 
 doc = '''Extrude the entities `dimTags' (given as a vector of (dim, tag) pairs) in the built-in CAD representation, using a rotation of `angle' radians around the axis of revolution defined by the point (`x', `y', `z') and the direction (`ax', `ay', `az'). The angle should be strictly smaller than Pi. Return extruded entities in `outDimTags'. If the `numElements' vector is not empty, also extrude the mesh: the entries in `numElements' give the number of elements in each layer. If the `height' vector is not empty, it provides the (cumulative) height of the different layers, normalized to 1. If `recombine' is set, recombine the mesh in the layers.'''
 geo.add('revolve', doc, None, ivectorpair('dimTags'), idouble('x'), idouble('y'), idouble('z'), idouble('ax'), idouble('ay'), idouble('az'), idouble('angle'), ovectorpair('outDimTags'), ivectorint('numElements', 'std::vector<int>()', '[]', '[]'), ivectordouble('heights', 'std::vector<double>()', '[]', '[]'), ibool('recombine', 'false', 'False'))
